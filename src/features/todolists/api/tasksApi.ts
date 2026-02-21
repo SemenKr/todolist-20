@@ -5,36 +5,37 @@ import type { DomainTask, GetTasksResponse, UpdateTaskModel } from "./tasksApi.t
 export const tasksApi = baseApi.injectEndpoints({
   endpoints: (build) => {
     return {
-      // 📥 Получение задач с серверной пагинацией
-      // Аргумент содержит id списка и номер страницы
+      // 📥 Получение задач конкретного todolist с серверной пагинацией
+      // В аргументе передаём id списка и параметры пагинации (page + count)
       getTasks: build.query<GetTasksResponse, { todolistId: string; params: { page: number; count: number } }>({
         query: ({ todolistId, params }) => ({
+          // 🌐 Запрос задач конкретного списка
           url: `todo-lists/${todolistId}/tasks`,
 
-          // 📄 Передаём page + фиксированный размер страницы
-          // PAGE_SIZE добавляется централизованно, чтобы не дублировать в компонентах
+          // 📄 Параметры пагинации уходят на сервер
+          // Сервер вернёт только одну страницу данных
           params: { ...params },
         }),
 
         // 🏷️ Описываем, какие теги создаёт этот query
-        // RTK Query будет использовать их для точечного refetch
+        // Эти теги используются RTK Query для точечной инвалидации
         providesTags: (result, _error, { todolistId }) =>
           result
             ? [
-                // 🔹 Тег каждой отдельной задачи
-                // Нужен для updateTask (точечное обновление)
+                // 🔹 Тег каждой задачи
+                // Нужен для точечного обновления через updateTask
                 ...result.items.map((task) => ({
                   type: "Task" as const,
                   id: task.id,
                 })),
 
                 // 🔹 Тег всего списка
-                // Нужен для add/remove (меняется структура массива)
+                // Нужен для add/remove, когда меняется структура массива
                 { type: "Task", id: `LIST-${todolistId}` },
               ]
             : [
-                // Даже если данных нет (ошибка),
-                // оставляем тег списка, чтобы можно было его инвалидировать
+                // Даже если произошла ошибка,
+                // сохраняем тег списка для будущей инвалидации
                 { type: "Task", id: `LIST-${todolistId}` },
               ],
       }),
@@ -47,8 +48,8 @@ export const tasksApi = baseApi.injectEndpoints({
           body: { title },
         }),
 
-        // 🔄 Инвалидируем только конкретный список
-        // Это вызовет refetch всех активных страниц этого todolist
+        // 🔄 Инвалидируем тег списка
+        // Это вызовет refetch всех активных страниц данного todolist
         invalidatesTags: (_result, _error, { todolistId }) => [{ type: "Task", id: `LIST-${todolistId}` }],
       }),
 
@@ -59,8 +60,8 @@ export const tasksApi = baseApi.injectEndpoints({
           method: "DELETE",
         }),
 
-        // 🧹 Инвалидируем тег списка
-        // Структура массива изменилась → нужно перезапросить текущие страницы
+        // 🧹 При удалении меняется структура массива,
+        // поэтому инвалидируем весь список
         invalidatesTags: (_result, _error, { todolistId }) => [{ type: "Task", id: `LIST-${todolistId}` }],
       }),
 
@@ -74,24 +75,51 @@ export const tasksApi = baseApi.injectEndpoints({
           method: "PUT",
           body: model,
         }),
-        async onQueryStarted({ taskId, model, todolistId }, { dispatch, queryFulfilled }) {
-          const patchResult = dispatch(
-            tasksApi.util.updateQueryData("getTasks", {todolistId, params: { page: 1, count: 10 } }, (state) => {
-              const index = state.items.findIndex((task) => task.id === taskId)
-              if (index !== -1) {
-                state.items[index] = { ...state.items[index], ...model }
-              }
-            }),
-          )
+
+        // 🚀 Optimistic update
+        // Мгновенно обновляем кэш до ответа сервера,
+        // чтобы UI не ждал завершения запроса
+        async onQueryStarted({ todolistId, taskId, model }, { dispatch, queryFulfilled, getState }) {
+          // 📦 Получаем аргументы всех закешированных getTasks
+          // (разные страницы и списки)
+          const cachedArgs = tasksApi.util.selectCachedArgsForQuery(getState(), "getTasks")
+
+          const patchResults: any[] = []
+
+          // 🔎 Обновляем только страницы текущего todolist
+          cachedArgs
+            .filter((arg) => arg.todolistId === todolistId)
+            .forEach((arg) => {
+              // 🛠 Обновляем данные конкретной задачи в кэше
+              const patch = dispatch(
+                tasksApi.util.updateQueryData("getTasks", arg, (state) => {
+                  debugger
+                  const task = state.items.find((t) => t.id === taskId)
+
+                  if (task) {
+                    // Объединяем старые данные с новыми полями
+                    Object.assign(task, model)
+                  }
+                }),
+              )
+
+              // 💾 Сохраняем patch для возможного отката
+              patchResults.push(patch)
+            })
+
           try {
+            // ⏳ Ожидаем подтверждение сервера
             await queryFulfilled
           } catch {
-            patchResult.undo()
+            // ❌ Если сервер вернул ошибку —
+            // откатываем optimistic изменения
+            patchResults.forEach((patch) => patch.undo())
           }
         },
 
         // 🎯 Инвалидируем только конкретную задачу
-        // Список не трогаем, так как структура не меняется
+        // Если optimistic update полностью покрывает изменения,
+        // этот refetch можно убрать
         invalidatesTags: (_result, _error, { taskId }) => [{ type: "Task", id: taskId }],
       }),
     }
