@@ -5,28 +5,41 @@ import type { DomainTask, GetTasksResponse, UpdateTaskModel } from "./tasksApi.t
 export const tasksApi = baseApi.injectEndpoints({
   endpoints: (build) => {
     return {
-      // 📥 Получение задач конкретного todolist
-      getTasks: build.query<GetTasksResponse, string>({
-        query: (todolistId) => `todo-lists/${todolistId}/tasks`,
+      // 📥 Получение задач с серверной пагинацией
+      // Аргумент содержит id списка и номер страницы
+      getTasks: build.query<GetTasksResponse, { todolistId: string; params: { page: number; count: number } }>({
+        query: ({ todolistId, params }) => ({
+          url: `todo-lists/${todolistId}/tasks`,
 
-        // 🏷️ Говорим RTK Query, какие теги создаёт этот query
-        // Каждый task получает свой тег + отдельный тег для всего списка
-        providesTags: (result, _error, todolistId) =>
+          // 📄 Передаём page + фиксированный размер страницы
+          // PAGE_SIZE добавляется централизованно, чтобы не дублировать в компонентах
+          params: { ...params },
+        }),
+
+        // 🏷️ Описываем, какие теги создаёт этот query
+        // RTK Query будет использовать их для точечного refetch
+        providesTags: (result, _error, { todolistId }) =>
           result
             ? [
-                // 🔹 Теги отдельных задач (для точечного обновления)
-                ...result.items.map(({ id }) => ({ type: "Task" as const, id })),
-                // 🔹 Тег всего списка (для add/remove)
+                // 🔹 Тег каждой отдельной задачи
+                // Нужен для updateTask (точечное обновление)
+                ...result.items.map((task) => ({
+                  type: "Task" as const,
+                  id: task.id,
+                })),
+
+                // 🔹 Тег всего списка
+                // Нужен для add/remove (меняется структура массива)
                 { type: "Task", id: `LIST-${todolistId}` },
               ]
             : [
-                // Даже при ошибке сохраняем тег списка,
-                // чтобы можно было его инвалидировать позже
+                // Даже если данных нет (ошибка),
+                // оставляем тег списка, чтобы можно было его инвалидировать
                 { type: "Task", id: `LIST-${todolistId}` },
               ],
       }),
 
-      // ➕ Добавление задачи
+      // ➕ Добавление новой задачи
       addTask: build.mutation<BaseResponse<{ item: DomainTask }>, { todolistId: string; title: string }>({
         query: ({ todolistId, title }) => ({
           url: `todo-lists/${todolistId}/tasks`,
@@ -34,8 +47,8 @@ export const tasksApi = baseApi.injectEndpoints({
           body: { title },
         }),
 
-        // 🔄 Инвалидируем только конкретный список,
-        // чтобы перезапросился именно он, а не все задачи
+        // 🔄 Инвалидируем только конкретный список
+        // Это вызовет refetch всех активных страниц этого todolist
         invalidatesTags: (_result, _error, { todolistId }) => [{ type: "Task", id: `LIST-${todolistId}` }],
       }),
 
@@ -46,16 +59,12 @@ export const tasksApi = baseApi.injectEndpoints({
           method: "DELETE",
         }),
 
-        // 🧹 Инвалидируем:
-        // 1️⃣ конкретную задачу
-        // 2️⃣ весь список (так как изменилась структура массива)
-        invalidatesTags: (_result, _error, { todolistId, taskId }) => [
-          { type: "Task", id: taskId },
-          { type: "Task", id: `LIST-${todolistId}` },
-        ],
+        // 🧹 Инвалидируем тег списка
+        // Структура массива изменилась → нужно перезапросить текущие страницы
+        invalidatesTags: (_result, _error, { todolistId }) => [{ type: "Task", id: `LIST-${todolistId}` }],
       }),
 
-      // ✏️ Обновление задачи
+      // ✏️ Обновление конкретной задачи
       updateTask: build.mutation<
         BaseResponse<{ item: DomainTask }>,
         { todolistId: string; taskId: string; model: UpdateTaskModel }
@@ -67,7 +76,7 @@ export const tasksApi = baseApi.injectEndpoints({
         }),
 
         // 🎯 Инвалидируем только конкретную задачу
-        // Список не трогаем, потому что структура массива не изменилась
+        // Список не трогаем, так как структура не меняется
         invalidatesTags: (_result, _error, { taskId }) => [{ type: "Task", id: taskId }],
       }),
     }
