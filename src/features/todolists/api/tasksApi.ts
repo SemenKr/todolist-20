@@ -74,6 +74,21 @@ export const tasksApi = baseApi.injectEndpoints({
           method: "PUT",
           body: model,
         }),
+        async onQueryStarted({ taskId, model, todolistId }, { dispatch, queryFulfilled }) {
+          const patchResult = dispatch(
+            tasksApi.util.updateQueryData("getTasks", {todolistId, params: { page: 1, count: 10 } }, (state) => {
+              const index = state.items.findIndex((task) => task.id === taskId)
+              if (index !== -1) {
+                state.items[index] = { ...state.items[index], ...model }
+              }
+            }),
+          )
+          try {
+            await queryFulfilled
+          } catch {
+            patchResult.undo()
+          }
+        },
 
         // 🎯 Инвалидируем только конкретную задачу
         // Список не трогаем, так как структура не меняется
