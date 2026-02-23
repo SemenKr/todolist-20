@@ -84,7 +84,7 @@ export const tasksApi = baseApi.injectEndpoints({
           // (разные страницы и списки)
           const cachedArgs = tasksApi.util.selectCachedArgsForQuery(getState(), "getTasks")
 
-          const patchResults: any[] = []
+          const patchResults: { undo: () => void }[] = []
 
           // 🔎 Обновляем только страницы текущего todolist
           cachedArgs
@@ -93,9 +93,7 @@ export const tasksApi = baseApi.injectEndpoints({
               // 🛠 Обновляем данные конкретной задачи в кэше
               const patch = dispatch(
                 tasksApi.util.updateQueryData("getTasks", arg, (state) => {
-                  debugger
                   const task = state.items.find((t) => t.id === taskId)
-
                   if (task) {
                     // Объединяем старые данные с новыми полями
                     Object.assign(task, model)

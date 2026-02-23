@@ -45,13 +45,15 @@ export const Tasks = ({ todolist }: Props) => {
           ))}
         </List>
       )}
-      <TasksPagination
-        totalCount={data?.totalCount || 0}
-        page={page}
-        setPage={setPage}
-        pageSize={pageSize}
-        setPageSize={setPageSize}
-      />
+      {data && data.totalCount > pageSize && (
+        <TasksPagination
+          totalCount={data.totalCount}
+          page={page}
+          setPage={setPage}
+          pageSize={pageSize}
+          setPageSize={setPageSize}
+        />
+      )}
     </>
   )
 }
