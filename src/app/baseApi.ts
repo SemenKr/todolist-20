@@ -18,7 +18,8 @@ export const baseApi = createApi({
     // 🌐 Создаём базовый запрос с конфигурацией
     const result = await fetchBaseQuery({
       baseUrl: import.meta.env.VITE_BASE_URL,
-
+      // разрешить браузеру работать с cookies при запросах к API
+      credentials: "include",
       // 🔑 Статический API-KEY для всех запросов
       headers: {
         "API-KEY": import.meta.env.VITE_API_KEY,
