@@ -36,15 +36,14 @@ export const TaskItem = ({ task, todolist }: Props) => {
   }
 
   const isTaskCompleted = task.status === TaskStatus.Completed
-  const disabled = todolist.entityStatus === "loading"
 
   return (
     <ListItem sx={getListItemSx(isTaskCompleted)}>
       <div>
-        <Checkbox checked={isTaskCompleted} onChange={changeTaskStatus} disabled={disabled} />
-        <EditableSpan value={task.title} onChange={changeTaskTitle} disabled={disabled} />
+        <Checkbox checked={isTaskCompleted} onChange={changeTaskStatus} />
+        <EditableSpan value={task.title} onChange={changeTaskTitle} />
       </div>
-      <IconButton onClick={deleteTask} disabled={disabled}>
+      <IconButton onClick={deleteTask} >
         <DeleteIcon />
       </IconButton>
     </ListItem>
