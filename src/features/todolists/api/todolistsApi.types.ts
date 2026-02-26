@@ -8,3 +8,7 @@ export const todolistSchema = z.object({
 })
 
 export type Todolist = z.infer<typeof todolistSchema>
+
+export type ReorderTodolistModel = {
+  putAfterItemId: string | null
+}

@@ -7,9 +7,10 @@ import { TodolistTitle } from "./TodolistTitle/TodolistTitle"
 
 type Props = {
   todolist: DomainTodolist
+  dragHandleRef?: (node: HTMLButtonElement | null) => void
 }
 
-export const TodolistItem = ({ todolist }: Props) => {
+export const TodolistItem = ({ todolist, dragHandleRef }: Props) => {
   const [addTask,{isLoading}] = useAddTaskMutation()
 
   const createTask = (title: string) => {
@@ -18,7 +19,7 @@ export const TodolistItem = ({ todolist }: Props) => {
 
   return (
     <div>
-      <TodolistTitle todolist={todolist} />
+      <TodolistTitle todolist={todolist} dragHandleRef={dragHandleRef} />
       <CreateItemForm onCreateItem={createTask} disabled={isLoading} />
       <Tasks todolist={todolist} />
       <FilterButtons todolist={todolist} />

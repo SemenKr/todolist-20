@@ -1,7 +1,7 @@
 import { baseApi } from "@/app/baseApi"
 import type { BaseResponse } from "@/common/types"
 import type { DomainTodolist } from "@/features/todolists/lib/types"
-import type { Todolist } from "./todolistsApi.types"
+import type { ReorderTodolistModel, Todolist } from "./todolistsApi.types"
 
 export const todolistsApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
@@ -49,6 +49,48 @@ export const todolistsApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ["Todolist"],
     }),
+    reorderTodolist: build.mutation<BaseResponse, { id: string; model: ReorderTodolistModel }>({
+      query: ({ id, model }) => ({
+        url: `todo-lists/${id}/reorder`,
+        method: "PUT",
+        body: model,
+      }),
+      async onQueryStarted({ id, model }, { dispatch, queryFulfilled }) {
+        const patchResult = dispatch(
+          todolistsApi.util.updateQueryData("getTodolists", undefined, (state) => {
+            const fromIndex = state.findIndex((todolist) => todolist.id === id)
+            if (fromIndex === -1) {
+              return
+            }
+
+            const [moved] = state.splice(fromIndex, 1)
+
+            if (model.putAfterItemId === null) {
+              state.unshift(moved)
+            } else {
+              const afterIndex = state.findIndex((todolist) => todolist.id === model.putAfterItemId)
+              if (afterIndex === -1) {
+                state.splice(fromIndex, 0, moved)
+              } else {
+                state.splice(afterIndex + 1, 0, moved)
+              }
+            }
+
+            const orderValues = state.map((todolist) => todolist.order).sort((a, b) => a - b)
+            state.forEach((todolist, index) => {
+              todolist.order = orderValues[index] ?? todolist.order
+            })
+          }),
+        )
+
+        try {
+          await queryFulfilled
+        } catch {
+          patchResult.undo()
+        }
+      },
+      invalidatesTags: ["Todolist"],
+    }),
   }),
 })
 
@@ -57,4 +99,5 @@ export const {
   useAddTodolistMutation,
   useRemoveTodolistMutation,
   useUpdateTodolistTitleMutation,
+  useReorderTodolistMutation,
 } = todolistsApi

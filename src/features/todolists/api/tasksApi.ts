@@ -1,6 +1,6 @@
 import { baseApi } from "@/app/baseApi"
 import type { BaseResponse } from "@/common/types"
-import type { DomainTask, GetTasksResponse, UpdateTaskModel } from "./tasksApi.types"
+import type { DomainTask, GetTasksResponse, ReorderTaskModel, UpdateTaskModel } from "./tasksApi.types"
 
 export const tasksApi = baseApi.injectEndpoints({
   endpoints: (build) => {
@@ -120,8 +120,73 @@ export const tasksApi = baseApi.injectEndpoints({
         // этот refetch можно убрать
         invalidatesTags: (_result, _error, { taskId }) => [{ type: "Task", id: taskId }],
       }),
+
+      // 🔀 Изменение порядка задач
+      reorderTask: build.mutation<
+        BaseResponse,
+        { todolistId: string; taskId: string; model: ReorderTaskModel }
+      >({
+        query: ({ todolistId, taskId, model }) => ({
+          url: `todo-lists/${todolistId}/tasks/${taskId}/reorder`,
+          method: "PUT",
+          body: model,
+        }),
+
+        // 🚀 Optimistic reorder
+        async onQueryStarted({ todolistId, taskId, model }, { dispatch, queryFulfilled, getState }) {
+          const cachedArgs = tasksApi.util.selectCachedArgsForQuery(getState(), "getTasks")
+          const patchResults: { undo: () => void }[] = []
+
+          cachedArgs
+            .filter((arg) => arg.todolistId === todolistId)
+            .forEach((arg) => {
+              const patch = dispatch(
+                tasksApi.util.updateQueryData("getTasks", arg, (state) => {
+                  const fromIndex = state.items.findIndex((task) => task.id === taskId)
+                  if (fromIndex === -1) {
+                    return
+                  }
+
+                  const [moved] = state.items.splice(fromIndex, 1)
+
+                  if (model.putAfterItemId === null) {
+                    state.items.unshift(moved)
+                  } else {
+                    const afterIndex = state.items.findIndex((task) => task.id === model.putAfterItemId)
+                    if (afterIndex === -1) {
+                      state.items.splice(fromIndex, 0, moved)
+                    } else {
+                      state.items.splice(afterIndex + 1, 0, moved)
+                    }
+                  }
+
+                  const orderValues = state.items.map((task) => task.order).sort((a, b) => a - b)
+                  state.items.forEach((task, index) => {
+                    task.order = orderValues[index] ?? task.order
+                  })
+                }),
+              )
+              patchResults.push(patch)
+            })
+
+          try {
+            await queryFulfilled
+          } catch {
+            patchResults.forEach((patch) => patch.undo())
+          }
+        },
+
+        // Инвалидируем список, т.к. меняется порядок
+        invalidatesTags: (_result, _error, { todolistId }) => [{ type: "Task", id: `LIST-${todolistId}` }],
+      }),
     }
   },
 })
 
-export const { useGetTasksQuery, useAddTaskMutation, useRemoveTaskMutation, useUpdateTaskMutation } = tasksApi
+export const {
+  useGetTasksQuery,
+  useAddTaskMutation,
+  useRemoveTaskMutation,
+  useUpdateTaskMutation,
+  useReorderTaskMutation,
+} = tasksApi
