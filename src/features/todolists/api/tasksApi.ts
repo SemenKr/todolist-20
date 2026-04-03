@@ -10,7 +10,7 @@ export const tasksApi = baseApi.injectEndpoints({
       getTasks: build.query<GetTasksResponse, { todolistId: string; params: { page: number; count: number } }>({
         query: ({ todolistId, params }) => ({
           // 🌐 Запрос задач конкретного списка
-          url: `todo-lists/${todolistId}/tasks`,
+          url: `/todo-lists/${todolistId}/tasks`,
 
           // 📄 Параметры пагинации уходят на сервер
           // Сервер вернёт только одну страницу данных
@@ -43,7 +43,7 @@ export const tasksApi = baseApi.injectEndpoints({
       // ➕ Добавление новой задачи
       addTask: build.mutation<BaseResponse<{ item: DomainTask }>, { todolistId: string; title: string }>({
         query: ({ todolistId, title }) => ({
-          url: `todo-lists/${todolistId}/tasks`,
+          url: `/todo-lists/${todolistId}/tasks`,
           method: "POST",
           body: { title },
         }),
@@ -56,7 +56,7 @@ export const tasksApi = baseApi.injectEndpoints({
       // ❌ Удаление задачи
       removeTask: build.mutation<BaseResponse, { todolistId: string; taskId: string }>({
         query: ({ todolistId, taskId }) => ({
-          url: `todo-lists/${todolistId}/tasks/${taskId}`,
+          url: `/todo-lists/${todolistId}/tasks/${taskId}`,
           method: "DELETE",
         }),
 
@@ -71,7 +71,7 @@ export const tasksApi = baseApi.injectEndpoints({
         { todolistId: string; taskId: string; model: UpdateTaskModel }
       >({
         query: ({ todolistId, taskId, model }) => ({
-          url: `todo-lists/${todolistId}/tasks/${taskId}`,
+          url: `/todo-lists/${todolistId}/tasks/${taskId}`,
           method: "PUT",
           body: model,
         }),

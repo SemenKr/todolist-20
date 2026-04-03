@@ -13,7 +13,7 @@ export const todolistsApi = baseApi.injectEndpoints({
     }),
     addTodolist: build.mutation<BaseResponse<{ item: Todolist }>, string>({
       query: (title) => ({
-        url: "todo-lists",
+        url: "/todo-lists",
         method: "POST",
         body: { title },
       }),
@@ -21,7 +21,7 @@ export const todolistsApi = baseApi.injectEndpoints({
     }),
     removeTodolist: build.mutation<BaseResponse, string>({
       query: (id) => ({
-        url: `todo-lists/${id}`,
+        url: `/todo-lists/${id}`,
         method: "DELETE",
       }),
       async onQueryStarted(id, { dispatch, queryFulfilled }) {
@@ -43,7 +43,7 @@ export const todolistsApi = baseApi.injectEndpoints({
     }),
     updateTodolistTitle: build.mutation<BaseResponse, { id: string; title: string }>({
       query: ({ id, title }) => ({
-        url: `todo-lists/${id}`,
+        url: `/todo-lists/${id}`,
         method: "PUT",
         body: { title },
       }),

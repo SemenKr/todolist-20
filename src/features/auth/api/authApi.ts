@@ -8,7 +8,7 @@ export const authApi = baseApi.injectEndpoints({
       query: (body) => ({ method: "post", url: "auth/login", body }),
     }),
     logout: builder.mutation<BaseResponse, void>({
-      query: () => ({ method: "delete", url: "auth/login" }),
+      query: () => ({ method: "delete", url: "/auth/login" }),
     }),
     getCaptchaUrl: builder.query<{ url: string }, void>({
       query: () => "security/get-captcha-url",
